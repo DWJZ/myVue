@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+
+<head>
+  <title>
+    myVue
+  </title>
+</head>
+<style>
+  #app {
+    text-align: center;
+  }
+</style>
+
+<body>
+
+  <div id="app">
+
+    <form>
+
+      <input type="text" v-model="number">
+
+      <button type="button" v-click="increment">增加</button>
+
+    </form>
+
+    <h3 v-bind="number"></h3>
+
+  </div>
+</body>
+<script>
+
+
+  function myVue(options) {
+    this._init(options)
+  }
+
+  myVue.prototype._init = function (options) {
+    this.$option = options
+    this.$el = document.querySelector(options.el)
+    this.$data = options.data
+    this.$methods = options.methods
+
+
+    this._binding = {}; // 指令由Watcher实例组成
+
+
+    this._obverse(this.$data)
+
+    this._complie(this.$el);
+  }
+
+  myVue.prototype._obverse = function (obj) {
+
+    for (key in obj) {
+      let value = obj[key]
+      // 递归调用
+      if (typeof value === 'object') {
+        this._obverse(value)
+      }
+
+      // hasOwnProperty() 方法会返回一个布尔值，指示对象自身属性中是否具有指定的属性.
+      console.log('key', key)
+      if (obj.hasOwnProperty(key)) {
+        this._binding[key] = {
+          _directives: []
+        }
+      }
+
+      var binding = this._binding[key]
+
+
+      Object.defineProperty(this.$data, key, {
+        enumerable: true,
+        configurable: true,
+        get() {
+          console.log('获取 value', key, value)
+          return value
+        },
+        set(newValue) {
+          console.log('更新 newValue', key, newValue)
+          debugger
+          if (value !== newValue) {
+            value = newValue
+            binding._directives.forEach(item => {
+              // 更新视图
+              item.update()
+            })
+          }
+        }
+      })
+    }
+  }
+
+  // 编译 绑定函数与值
+  myVue.prototype._complie = function (root) {
+
+    let _this = this
+    let nodes = root.children
+    for (let i = 0; i < nodes.length; i++) {
+      let node = nodes[i]
+      if (node.children.length) {
+        this._complie(node)
+      }
+
+      // 触发v-click绑定的函数
+      if (node.hasAttribute('v-click')) {
+
+        let attrVal = node.getAttribute('v-click')
+
+        node.onclick = _this.$methods[attrVal].bind(_this.$data)
+      }
+      
+      // 绑定 含有v-model的input input值改变 需要改变绑定的data
+      // 双向绑定
+      if (node.hasAttribute('v-model') && (node.tagName == 'INPUT' || node.tagName == 'TEXTAREA')) {
+
+        let attrVal = node.getAttribute('v-model')
+
+        // 添加watcher 数据set时触发watcher 更新视图
+        _this._binding[attrVal]._directives.push(new Watcher('input', node, _this, attrVal, 'value'))
+
+        
+        node.addEventListener('input', function () {
+          _this.$data[attrVal] = node.value
+        })
+      }
+
+      if (node.hasAttribute('v-bind')) {
+        let attrVal = node.getAttribute('v-bind')
+        // 添加watcher 数据set时触发watcher 更新视图
+        _this._binding[attrVal]._directives.push(new Watcher('text', node, _this, attrVal, 'innerHTML'))
+
+      }
+    }
+  }
+
+
+
+  function Watcher(name, el, vm, exp, attr) {
+    this.name = name
+    this.el = el
+    this.vm = vm
+    this.exp = exp
+    this.attr = attr
+
+    this.update()
+  }
+
+  Watcher.prototype.update = function () {
+    this.el[this.attr] = this.vm.$data[this.exp]
+  }
+
+
+
+  window.onload = function () {
+    var app = new myVue({
+      el: '#app',
+      data: { number: 0 },
+      methods: {
+        increment: function () {
+          this.number++;
+        },
+      }
+    })
+
+    console.log(app)
+  } 
+</script>
